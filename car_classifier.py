@@ -3,10 +3,64 @@ import torchvision.models
 from PIL import Image
 import torch
 import torch.nn as nn
+import cv2
+import numpy as np
 
 def predict_car(path_to_model, path_to_image):
 
-        clases = ['AM General Hummer SUV 2000',
+    net = cv2.dnn.readNetFromDarknet('yolo-coco/yolov3.cfg', 'yolo-coco/yolov3.weights')
+
+    image = cv2.imread(path_to_image)
+    (H, W) = image.shape[:2]
+
+    ln = net.getLayerNames()
+    ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+
+    blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416),
+                              swapRB=True, crop=False)
+    net.setInput(blob)
+    layerOutputs = net.forward(ln)
+    boxes = []
+    confidences = []
+    classIDs = []
+
+    for output in layerOutputs:
+        for detection in output:
+            scores = detection[5:]
+            classID = np.argmax(scores)
+            confidence = scores[classID]
+
+            if confidence > 0.5:
+                box = detection[0:4] * np.array([W, H, W, H])
+                (centerX, centerY, width, height) = box.astype("int")
+
+                x = int(centerX - (width / 2))
+                y = int(centerY - (height / 2))
+
+                boxes.append([x, y, int(width), int(height)])
+                confidences.append(float(confidence))
+                classIDs.append(classID)
+
+    idxs = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.3)
+
+    bboxs = []
+    list_of_cars = []
+
+    if len(idxs) > 0:
+        for i in idxs.flatten():
+            bbox = []
+            (x, y) = (boxes[i][0], boxes[i][1])
+            (w, h) = (boxes[i][2], boxes[i][3])
+            if classIDs[i] == 2:
+                bbox.append(x)
+                bbox.append(y)
+                bbox.append(w)
+                bbox.append(h)
+                bboxs.append(bbox)
+                image_crop = image[bboxs[0][1]:bboxs[0][1] + bboxs[0][3], bboxs[0][0]:bboxs[0][0] + bboxs[0][2]]
+                list_of_cars.append(image_crop)
+
+    clases = ['AM General Hummer SUV 2000',
  'Acura Integra Type R 2001',
  'Acura RL Sedan 2012',
  'Acura TL Sedan 2012',
@@ -203,21 +257,27 @@ def predict_car(path_to_model, path_to_image):
  'Volvo XC90 SUV 2007',
  'smart fortwo Convertible 2012']
 
-        transforms = tr.Compose([tr.Resize((224, 224)),
-                                 tr.ToTensor(),
-                                 tr.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
+    transforms = tr.Compose([tr.ToPILImage(),
+                             tr.Resize((224, 224)),
+                             tr.ToTensor(),
+                             tr.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
 
-        model = torchvision.models.resnet101(pretrained=False)
-        model.fc = nn.Linear(2048, 196)
-        model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
-        model.eval()
-        image = Image.open(path_to_image)
+    model = torchvision.models.resnet101(pretrained=False)
+    model.fc = nn.Linear(2048, 196)
+    model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
+    model.eval()
+
+    cars_on_photo = []
+    for i in list_of_cars:
+        image = i
         image = transforms(image).float()
         image = torch.autograd.Variable(image.view(3, 224, 224))
         image = image.unsqueeze(0)
         pred = model(image)
         _, predict = torch.max(pred.data, 1)
-        return clases[predict.item()]
+        car_class = clases[predict.item()]
+        cars_on_photo.append(car_class)
+    return cars_on_photo
 
-car = predict_car('C:/Users/esus/Desktop/model_stat_dict.pt', 'C:/Users/esus/Desktop/00068.jpg')
-print(car)
+cars_on_photo = predict_car('C:/Users/esus/Desktop/model_stat_dict.pt', 'C:/Users/esus/Desktop/3.jpg')
+print(cars_on_photo)
