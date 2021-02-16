@@ -279,5 +279,3 @@ def predict_car(path_to_model, path_to_image):
         cars_on_photo.append(car_class)
     return cars_on_photo
 
-cars_on_photo = predict_car('C:/Users/esus/Desktop/model_stat_dict.pt', 'C:/Users/esus/Desktop/3.jpg')
-print(cars_on_photo)
