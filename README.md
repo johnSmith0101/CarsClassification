@@ -10,4 +10,4 @@
 - [x] Распознование сразу нескольких автомобилей на одном фото.  
 - [ ] Определение цвета авто. 
 
-![proofs]it_works_yes.jpg
+![proofs](https://github.com/johnSmith0101/projects/blob/main/it_works_yes.jpg)
